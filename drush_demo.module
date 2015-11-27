@@ -277,7 +277,18 @@ function demo_drush_unpublish ($all, $types) {
     if ($result) {
       foreach ($result as $data) {
         set_time_limit(30);
-        db_update("UPDATE node SET status=0");
+		db_update('node')
+		->fields(array(
+		'status' => 0,
+		))
+		->condition('nid', $data->nid)
+		->execute();
+        db_update('node_revision')
+		->fields(array(
+		'status' => 0,
+		))
+		->condition('nid', $data->nid)
+		->execute();
         $deleted ++;
       }
     }
