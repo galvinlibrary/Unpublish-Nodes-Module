@@ -1,0 +1,281 @@
+<?php
+
+function form_example_menu() {
+  $items = array();
+
+  $items['admin/content/node_unpublish'] = array( //this creates a URL that will call this form at "examples/form-example"
+    'title' => 'Node Unpublish', //page title
+    'description' => 'Unpublish all nodes of a specified content type here.',
+    'page callback' => 'drupal_get_form', //this is the function that will be called when the page is accessed.  for a form, use drupal_get_form
+    'page arguments' => array('node_unpublish'), //put the name of the form here
+    'access callback' => TRUE
+  );
+  $items['admin/content/node_unpublish/confirm'] = array(
+    'title'            => 'Confirm unpublishing of content',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('node_unpublish_confirm'),
+    //'access arguments' => array('administer nodes'),
+    //'type'             => MENU_CALLBACK,
+	'access callback' => TRUE
+  );
+  return $items;
+}
+
+function node_unpublish() {
+  // count how many nodes we have of each type
+  $result = db_query("SELECT type, COUNT(*) AS num FROM {node} GROUP BY type");
+  $count = array();
+  foreach ($result as $data) {
+    $count[$data->type] = $data->num;
+  }
+
+  // Add the types to the form. If there are no eligible types to delete,
+  // we don't need to render the form.
+  $types = array();
+  foreach (node_type_get_types() as $type => $info) {
+    if (array_key_exists($type, $count)) {
+      $types[$type] = $info->name . ' (' . $count[$type] . ')';
+    }
+  }
+  asort($types);
+
+  if (empty($types)) {
+    $form = array();
+    $form['no_content_types'] = array(
+      '#prefix' => '<p>',
+      '#suffix' => '</p>',
+      '#value' => t('There are no content types with content available to unpublish. You must <a href="@node-add">create some content</a> in order to delete it.', array('@node-add' => url('node/add'))),
+    );
+
+    if (module_exists('devel')) {
+      $form['generate_content_suggestion'] = array(
+        '#prefix' => '<p>',
+        '#suffix' => '</p>',
+        '#value' => t('You can generate content quickly at the <a href="@generate-content-page">generate content page</a>.', array('@generate-content-page' => url('admin/generate/content'))),
+      );
+    }
+    return $form;
+  }
+
+ // drupal_add_js(drupal_get_path('module', 'delete_all') . '/delete_all.js');
+  $form = array();
+  $form['all'] = array(
+    '#type' => 'checkbox',
+    '#default_value' => FALSE,
+    '#title' => t('Unpublish Content'),
+    '#description' => t('Select to unpublish all content'),
+    '#attributes' => array('class' => array('ddc')),
+  );
+/* Working on this functionality in node_unpublish.drush.inc...... MK
+  $form['reset'] = array(
+    '#type' => 'checkbox',
+    '#default_value' => FALSE,
+    '#title' => t('Reset node count'),
+    '#description' => t('Select to reset the node count'),
+    '#attributes' => array('class' => array('delete-reset')),
+  );
+*/
+  $form['type-fieldset'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Types'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    'types' => array(
+      '#type' => 'checkboxes',
+      '#options' => $types,
+      '#description' => t('Select the types of content to unpublish'),
+    ),
+  );
+  $form['method-fieldset'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Method'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    'method' => array(
+      '#type' => 'radios',
+      '#title' => t('Method'),
+      '#options' => array('normal' => t('Normal'), 'quick' => t('Quick')),
+      '#default_value' => 'normal',
+      '#description' => t('Normal node delete calls node_delete() on every node in the database.  If you have only a few hundred nodes, this can take a very long time.  Use the quick node delete method to get around this problem.  This method deletes directly from the database, skipping the extra php processing.  The downside is that it can miss related tables that are normally handled by module hook_delete\'s.'),
+    ),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Unpublish'),
+  );
+  $form['#action'] = url('admin/content/node_unpublish/confirm');
+  return $form;
+}
+function node_unpublish_confirm() {
+  $results = $_POST;
+
+  $form = array();
+  $form['method'] = array(
+    '#type' => 'hidden',
+    '#value' => $results['method'],
+  );
+
+  if (!isset($results['all']) ) {
+    $results['all'] = '';
+  }
+
+  if (!isset($results['reset']) ) {
+    $results['reset'] = '';
+  }
+
+  $form['all'] = array(
+    '#type' => 'hidden',
+    '#value' => $results['all'],
+  );
+
+  if (isset($results['all']) && !isset($results['types'])) {
+    if (!empty($results['all']) ) {
+      // Only carry reset value through if delete all nodes is set
+      $form['reset'] = array(
+        '#type' => 'hidden',
+        '#value' => $results['reset'],
+      );
+
+      $form['all_warning'] = array(
+        '#markup' => '<p>' . t('All content in all content types will be unpublished. Be sure to have a backup of any important data!') . '</p>'
+      );
+    }
+    if (!empty($results['reset']) ) {
+      if (empty($results['all']) ) {
+        $form['all_reset'] = array(
+          '#markup' => '<p>' . t('Sorry, we can\'t reset the counters because you are not unpublishing all nodes.') . '</p>'
+        );
+      }
+      else {
+        $form['all_reset'] = array(
+          '#markup' => '<p>' . t('Node, revision and comment counts will be reset.') . '</p>'
+        );
+      }
+    }
+  }
+
+  if (isset($results['types']) ) {
+    if (is_array($results['types'])) {
+      foreach ($results['types'] as $key_type => $type) {
+        $form['type_' . $key_type] = array(
+          '#type' => 'hidden',
+          '#value' => $type,
+        );
+        $info = node_type_get_types('type', $type);
+        $info = $info[$type];
+
+        $form[$type . '_warning'] = array(
+          '#markup' => '<p>' . t('All content in the %type content type will be unpublished. Be sure to have a backup of any important data!', array('%type' => $info->name)) . '</p>'
+        );
+      }
+    }
+  }
+
+  $keys = array_filter(array_keys($results), "_unpublish_all_type_keys");
+
+  foreach ($keys as $key) {
+    $form[$key] = array(
+      '#type' => 'hidden',
+      '#value' => $results[$key],
+    );
+  }
+
+  return confirm_form($form, t('Are you sure you wish to unpublish content?'), 'admin/content/node_unpublish', NULL, t('Unpublish all content now'), t('Cancel unpublish of all content'));
+}
+function node_unpublish_confirm_submit($form, &$form_state) {
+  $types = array();
+  $keys = array_filter(array_keys($form_state['values']), "_unpublish_all_type_keys");
+  foreach ($keys as $key) {
+    $types[] = $form_state['values'][$key];
+  }
+  switch ($form_state['values']['method']) {
+    case 'normal':
+      $count = demo_drush_unpublish($form_state['values']['all'], $types);
+      break;
+
+    case 'quick':
+      // the quick method doesn't support an all option,
+      // so just get all the content types and delete all of those
+      if ($form_state['values']['all']) {
+        $result = db_query("SELECT DISTINCT type FROM {node}");
+        foreach ($result as $data) {
+          // while ($data = db_fetch_object($result)) {
+          $types[] = $type;
+        }
+      }
+      $count = _demo_drush_unpublish($types);
+      break;
+  }
+
+  if (!$types) {
+    // Delete the URL aliases
+    db_query("DELETE FROM {url_alias} WHERE source LIKE 'node/%%'");
+
+    drupal_set_message(t('All nodes, comments and URL aliases have been deleted. Number of nodes deleted: !count.', array('!count' => check_plain($count))));
+
+    if ($form_state['values']['reset']) {
+      db_query("ALTER TABLE node AUTO_INCREMENT=1");
+      db_query("ALTER TABLE node_revision AUTO_INCREMENT=1");
+      if (module_exists('comment')) {
+        db_query("ALTER TABLE comment AUTO_INCREMENT=1");
+        drupal_set_message(t('All node, revision and comment counts have been reset.'));
+      }
+      else {
+        drupal_set_message(t('All node and revision counts have been reset.'));
+      }
+    }
+  }
+  else {
+    drupal_set_message(t('Nodes and comments of type @type have been unpublished. Number of nodes unpublished: !count.', array('!count' => check_plain($count), '@type' => implode(', ', $types))));
+  }
+
+  drupal_goto('admin');
+}
+function demo_drush_unpublish ($all, $types) {
+  $results = array();
+  $unpublished = 0;
+  if (is_array($types) && count($types) > 0) {
+    foreach ($types as $type) {
+      $results[] = db_query(
+        'SELECT nid FROM {node} WHERE type = :type',
+        array(':type' => $type)
+      );
+    }
+  }
+  else {
+    $results[] = db_query(
+      'SELECT nid FROM {node}'
+    );
+  }
+  foreach ($results as $result) {
+    if ($result) {
+      foreach ($result as $data) {
+        set_time_limit(30);
+		db_update('node')
+		->fields(array(
+		'status' => 0,
+		))
+		->condition('nid', $data->nid)
+		->execute();
+        db_update('node_revision')
+		->fields(array(
+		'status' => 0,
+		))
+		->condition('nid', $data->nid)
+		->execute();
+        $unpublished ++;
+      }
+    }
+  }
+  return $unpublished;
+}
+/**
+ * Private callback to determine if a variable starts with 'type_'.
+ * @param $var
+ *   The string to test against.
+ * @return bool
+ *  TRUE if $var begins with 'type_'
+ */
+function _unpublish_all_type_keys($var) {
+  return (strpos($var, 'type_') === 0 ? TRUE : FALSE);
+}
