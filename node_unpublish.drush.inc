@@ -3,12 +3,12 @@
 /**
  * Implements hook_drush_command().
  */
-function drush_demo_drush_command() {
+function node_unpublish_drush_command() {
   $items = array();
-  $items['drush-demo-command'] = array(
-    'callback' => 'drush_demo_command_drush_unpublish',
+  $items['node_unpublish'] = array(
+    'callback' => 'drush_node_unpublish',
     'description' => 'Unpublish all nodes of a certain type.',
-    'aliases' => array('ddc'),
+    'aliases' => array('nu'),
     'options' => array(
       'roles' => 'pick roles',
       'reset' => 'Reset counter for node, revision and comment tables.',
@@ -27,9 +27,9 @@ function drush_demo_drush_command() {
 /**
  * Implementation of hook_drush_help().
  */
-function drush_demo_command_drush_help($section) {
+function drush_node_unpublish_help($section) {
   switch ($section) {
-    case 'drush:ddc':
+    case 'drush:nu':
     return dt("Unpublish all nodes of a specified content type.");
   }
 }
@@ -37,7 +37,7 @@ function drush_demo_command_drush_help($section) {
 /**
  * Drush callback to delete content
  */
-function drush_demo_command_drush_unpublish() {
+function drush_node_unpublish() {
   $types = func_get_args();
   if ($types) {
     if (in_array('users', $types)) {

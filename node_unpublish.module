@@ -57,7 +57,7 @@ function node_unpublish() {
     return $form;
   }
 
- // drupal_add_js(drupal_get_path('module', 'delete_all') . '/delete_all.js');
+  drupal_add_js(drupal_get_path('module', 'node_unpublish') . '/node_unpublish.js');
   $form = array();
   $form['all'] = array(
     '#type' => 'checkbox',
@@ -231,6 +231,7 @@ function node_unpublish_confirm_submit($form, &$form_state) {
 
   drupal_goto('admin');
 }
+//Function goes into database and unpublishes nodes.
 function demo_drush_unpublish ($all, $types) {
   $results = array();
   $unpublished = 0;
