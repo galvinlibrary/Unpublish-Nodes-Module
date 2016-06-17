@@ -1,27 +1,28 @@
 <?php
-
-function form_example_menu() {
-  $items = array();
-
-  $items['admin/content/node_unpublish'] = array( //this creates a URL that will call this form at "examples/form-example"
+function node_unpublish_menu() {
+	$items = array();
+	$path = drupal_get_path('module/custom', 'node_unpublish');
+   $items['admin/content/node_unpublish'] = array( //this creates a URL that will call this form at "examples/form-example"
     'title' => 'Node Unpublish', //page title
     'description' => 'Unpublish all nodes of a specified content type here.',
     'page callback' => 'drupal_get_form', //this is the function that will be called when the page is accessed.  for a form, use drupal_get_form
     'page arguments' => array('node_unpublish'), //put the name of the form here
-    'access callback' => TRUE
+    'access arguments' => array('access content'),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
   );
   $items['admin/content/node_unpublish/confirm'] = array(
     'title'            => 'Confirm unpublishing of content',
     'page callback'    => 'drupal_get_form',
     'page arguments'   => array('node_unpublish_confirm'),
-    //'access arguments' => array('administer nodes'),
-    //'type'             => MENU_CALLBACK,
-	'access callback' => TRUE
-  );
+    'access arguments' => array('access content'),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+	);
   return $items;
 }
 
-function node_unpublish() {
+function node_unpublish($form, &$form_state) {
   // count how many nodes we have of each type
   $result = db_query("SELECT type, COUNT(*) AS num FROM {node} GROUP BY type");
   $count = array();
@@ -75,6 +76,7 @@ function node_unpublish() {
     '#attributes' => array('class' => array('delete-reset')),
   );
 */
+
   $form['type-fieldset'] = array(
     '#type' => 'fieldset',
     '#title' => t('Types'),
@@ -86,7 +88,7 @@ function node_unpublish() {
       '#description' => t('Select the types of content to unpublish'),
     ),
   );
-  $form['method-fieldset'] = array(
+  /*$form['method-fieldset'] = array(
     '#type' => 'fieldset',
     '#title' => t('Method'),
     '#collapsible' => TRUE,
@@ -98,7 +100,8 @@ function node_unpublish() {
       '#default_value' => 'normal',
       '#description' => t('Normal node delete calls node_delete() on every node in the database.  If you have only a few hundred nodes, this can take a very long time.  Use the quick node delete method to get around this problem.  This method deletes directly from the database, skipping the extra php processing.  The downside is that it can miss related tables that are normally handled by module hook_delete\'s.'),
     ),
-  );
+  );*/
+  
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Unpublish'),
@@ -277,6 +280,7 @@ function demo_drush_unpublish ($all, $types) {
  * @return bool
  *  TRUE if $var begins with 'type_'
  */
+ 
 function _unpublish_all_type_keys($var) {
   return (strpos($var, 'type_') === 0 ? TRUE : FALSE);
 }

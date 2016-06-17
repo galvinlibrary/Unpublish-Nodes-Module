@@ -72,7 +72,7 @@ function drush_node_unpublish() {
      // }
     }
     else {
-      drush_print('Unpublished ' . demo_drush_unpublish(FALSE, $types) . ' woozles');
+      drush_print('Unpublished ' . demo_drush_unpublish(FALSE, $types) . 'nodes'.);
     }
   }
   else {

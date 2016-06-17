@@ -1,3 +1,3 @@
 core = "7.x"
-description = "An example module used to learn module development and forms creation."
+description = "A module that allows user to unpublish all nodes of a specific content type."
 name = "Node Unpublish"
